@@ -14,7 +14,12 @@
 
 use dl = std::unstable::dynamic_lib;
 use collections::hashmap::HashMap;
+use rustuv;
+use std::rt;
+use std::task::TaskOpts;
 use serialize::{json, Decodable};
+use green::{SchedPool, PoolConfig};
+use proton::messenger::Messenger;
 
 use modules;
 
@@ -22,45 +27,68 @@ use modules;
 pub type Args = Option<json::Decoder>;
 pub type PluginCallback = extern "Rust" fn(Args);
 
+/// Listener struct
+struct Listener<'l> {
+    module: &'l str,
+    method: &'l str,
+    cb: PluginCallback,
+}
+
+
+/// Listener Impl
+impl<'l> Listener<'l> {
+
+    pub fn new(module: &'l str, method: &'l str, cb: PluginCallback) -> Listener<'l> {
+        Listener {
+            module: module,
+            method: method,
+            cb: cb
+        }
+    }
+}
+
+
 /// Registers struct
 pub struct Register<'r> {
     /// Path where modules are located
     prefix: Path,
 
-    /// (worker, library) map
-    libs: HashMap<&'r str, dl::DynamicLibrary>,
-
-    /// (method, callback) map
-    methods: HashMap<&'r str, PluginCallback>,
+    scheduler: SchedPool,
 }
+/// (method, callback) map
+    ///methods: HashMap<&'r str, Listener<'r>>,
 
 /// Register trait
 impl<'r> Register<'r> {
 
     /// Static constructor
     pub fn new(path: &'r str) -> Register {
+        let config = PoolConfig {threads: rt::default_sched_threads(),
+                                 event_loop_factory: rustuv::event_loop};
+        let sched = SchedPool::new(config);
+
         Register {
+            scheduler: sched,
             prefix: Path::new(path),
-            libs: HashMap::new(),
-            methods: HashMap::new(),
+            //methods: HashMap::new(),
         }
     }
 
     /// Lookup a method
-    pub fn lookup(&self, method: &'r str) -> Option<PluginCallback> {
-        debug!("Looking for method={}, number of registered methods={}",
-               method, self.methods.len())
-        match self.methods.find(&method) {
-            Some(callback) => {
-                Some(*callback)
-            }
-            _ => {fail!("erm, wrong!")}
-        }
-    }
+    //pub fn lookup(&self, method: &'r str) -> Option<Listener<'r>> {
+    //    debug!("Looking for method={}, number of registered methods={}",
+    //           method, self.methods.len())
+    //    match self.methods.find(&method.to_owned()) {
+    //        Some(callback) => {
+    //            Some(*callback)
+    //        }
+    //        _ => {fail!("erm, wrong!")}
+    //    }
+    //}
 
     /// Find and call method
     pub fn call(&self, method: &'r str, args: Args) {
-        self.lookup(method).unwrap()(args)
+        //self.lookup(method).unwrap()(args)
     }
 
     /// Registers a method
@@ -76,8 +104,6 @@ impl<'r> Register<'r> {
                     Ok(reg) => {reg(self);}
                     _ => { info!("Worker {} has no register", worker)}
                 }
-
-                self.libs.insert(worker, lib);
             },
             _ => {info!("Worker module {} could not be found!", worker)}
         }
@@ -85,12 +111,42 @@ impl<'r> Register<'r> {
 
     /// Register new methods
     #[no_mangle]
-    pub fn register(&mut self, method: &'r str, f: PluginCallback) {
-        self.methods.insert(method, f);
+    pub fn register(&mut self, module: &'r str, method: &'r str, f: PluginCallback) {
+        let l = Listener::new(module, method, f);
+        //self.methods.insert(method.to_owned(), l);
+        self.scheduler.spawn(TaskOpts::new(), proc() {
+            let mut msgr = Messenger::new("test");
+            msgr.start();
+            msgr.subscribe("amqp://~0.0.0.0");
+
+            loop {
+                msgr.recv(1024);
+                debug!("Received something");
+
+                for msg in msgr {
+                    debug!("Got Message");
+                    //let data = pn_message_body(message);
+                    //let mut buf = [0 as libc::c_schar, ..1024u];
+                    //pn_data_format(data, buf.as_mut_ptr(), &(buf.len() as libc::size_t));
+                    //let ret = c_str::CString::new (pn_message_get_address(message), true);
+                    debug!("Address {}", msg.get_address());
+                    debug!("Subject {}", msg.get_subject());
+                    debug!("{}", msg.get_body());
+                    // Calling this, will make the next
+                    // message get segfault. Needs investigation.
+                    //pn_message_free(message);
+                }
+            }
+        })
     }
 }
 
+impl<'r> Drop for Register<'r> {
+    fn drop(&mut self) {
+        println!("{}", self.prefix.display());
 
+    }
+}
 
 #[cfg(test)]
 mod test {

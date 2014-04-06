@@ -24,7 +24,7 @@ SHELL := /bin/bash
 EXAMPLE_FILES = examples/*.rs
 
 COMPILER = rustc
-COMPILER_FLAGS = -Z no-landing-pads
+COMPILER_FLAGS = -Z no-landing-pads -L ~/.rust/lib -L build/
 RUSTDOC = rustdoc
 
 all:
@@ -140,9 +140,11 @@ rlib: build src src/lib.rs $(shell test -e src/ && find src/ -type f)
 	&& echo "--- Built rlib" \
 	&& echo "--- Type 'make test' to test library"
 
+
 drops: build
 	clear \
 	&& $(COMPILER) $(COMPILER_FLAGS) --crate-type=rlib src/drops/lib.rs --out-dir build/ \
+	&& $(COMPILER) $(COMPILER_FLAGS) src/server/main.rs --out-dir build/ \
 	&& clear \
 	&& echo "--- Built drops" \
 	&& echo "--- Type 'make test-drops' to test library"

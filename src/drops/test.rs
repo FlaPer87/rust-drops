@@ -15,7 +15,10 @@
 
 extern crate drops;
 extern crate collections;
+extern crate green;
+extern crate rustuv;
 extern crate serialize;
+extern crate proton;
 
 #[phase(syntax, link)]
 extern crate log;

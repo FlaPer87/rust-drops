@@ -27,7 +27,7 @@ use serialize::{json, Decodable};
 
 #[no_mangle]
 pub fn register_worker(register: &mut register::Register) {
-    register.register("info", info);
+    register.register("console", "info", info);
 }
 
 pub fn info(arg: register::Args) {
