@@ -1,0 +1,8 @@
+.DS_Store
+/bin/
+/doc/
+/build/
+/.rust
+rusti.sh
+*.rs~
+examples/hello
