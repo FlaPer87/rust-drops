@@ -15,28 +15,28 @@
 use dl = std::unstable::dynamic_lib;
 
 /// Loads modules
-pub fn load(prefix: &Path, name: ~str) -> Result<dl::DynamicLibrary, ~str> {
-    let x = prefix.join(libname(name));
+pub fn load(prefix: &Path, name: &str) -> Result<dl::DynamicLibrary, ~str> {
+    let x = prefix.join(libname(StrBuf::from_str(name)).into_owned());
     debug!("Full module path: {}", x.display());
     dl::DynamicLibrary::open(Some(&x))
 }
 
 #[cfg(target_os="win32")]
-fn libname(mut n: ~str) -> ~str {
+fn libname(mut n: StrBuf) -> StrBuf {
     n.push_str(".dll");
     n
 }
 
 #[cfg(target_os="macos")]
-fn libname(mut n: ~str) -> ~str {
+fn libname(mut n: StrBuf) -> StrBuf {
     n.push_str(".dylib");
     n
 }
 
 #[cfg(not(target_os="win32"), not(target_os="macos"))]
-fn libname(n: ~str) -> ~str {
-    let mut i = ~"lib";
-    i.push_str(n);
+fn libname(n: StrBuf) -> StrBuf {
+    let mut i = StrBuf::from_str("lib");
+    i.push_str(n.as_slice());
     i.push_str(".so");
     i
 }

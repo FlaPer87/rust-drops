@@ -109,15 +109,26 @@ impl<'r> Register<'r> {
         }
     }
 
+    /// Shutdown
+    pub fn shutdown(mut self) {
+        self.scheduler.shutdown();
+    }
+
     /// Register new methods
     #[no_mangle]
     pub fn register(&mut self, module: &'r str, method: &'r str, f: PluginCallback) {
         let l = Listener::new(module, method, f);
         //self.methods.insert(method.to_owned(), l);
+        let mut address = StrBuf::new();
+        address.push_str("amqp://~0.0.0.0/");
+        address.push_str(module);
+        address.push_str(".");
+        address.push_str(method);
+
         self.scheduler.spawn(TaskOpts::new(), proc() {
             let mut msgr = Messenger::new("test");
             msgr.start();
-            msgr.subscribe("amqp://~0.0.0.0");
+            msgr.subscribe(address.into_owned());
 
             loop {
                 msgr.recv(1024);
@@ -138,13 +149,6 @@ impl<'r> Register<'r> {
                 }
             }
         })
-    }
-}
-
-impl<'r> Drop for Register<'r> {
-    fn drop(&mut self) {
-        println!("{}", self.prefix.display());
-
     }
 }
 
